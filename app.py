@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 from alpha_vantage.timeseries import TimeSeries
 import ta  # Technical Analysis indicators
+import requests  # Needed for Telegram alerts
 
 # --- Page Setup ---
 st.set_page_config(page_title="ChartPulse", layout="wide")
@@ -17,6 +18,7 @@ st.sidebar.header("⚙️ Settings")
 symbols = st.sidebar.text_area("Stock Symbols (comma-separated)", "RELIANCE.BSE, TCS.BSE").split(",")
 symbols = [s.strip().upper() for s in symbols if s.strip()]
 show_chart = st.sidebar.checkbox("📊 Show Chart", True)
+enable_alerts = st.sidebar.checkbox("📲 Enable Telegram Alerts", True)
 
 # --- Interval Selector ---
 interval = st.selectbox("🕒 Select Interval", ["1d"], index=0)
@@ -101,6 +103,29 @@ for symbol in symbols:
 
         if show_chart:
             plot_chart(df, symbol)
+
+        # --- Signal Detection ---
+        alert = None
+        if latest > breakout:
+            alert = f"🚀 *{symbol} Breakout!* ₹{safe_fmt(latest)} > ₹{safe_fmt(breakout)}"
+        elif latest < breakdown:
+            alert = f"⚠️ *{symbol} Breakdown!* ₹{safe_fmt(latest)} < ₹{safe_fmt(breakdown)}"
+
+        # --- Telegram Alert ---
+        if enable_alerts and alert:
+            try:
+                bot_token = st.secrets["BOT_TOKEN"]
+                chat_id = st.secrets["CHAT_ID"]
+                send_text = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                params = {"chat_id": chat_id, "text": alert, "parse_mode": "Markdown"}
+                response = requests.post(send_text, data=params)
+
+                if response.status_code == 200:
+                    st.success("📲 Telegram alert sent!")
+                else:
+                    st.warning("⚠️ Alert failed to send.")
+            except Exception as e:
+                st.warning(f"❌ Telegram Error: {e}")
 
     except Exception as e:
         st.error(f"⚠️ Processing error for {symbol}")
