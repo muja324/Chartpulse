@@ -4,17 +4,10 @@ import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-import ta  # Technical Analysis library
-
-# Dummy fallback UI functions (remove if you have actual files)
-def show_loader(msg="Loading..."):
-    st.spinner(msg)
-
-def show_navigation():
-    return "📈 Live Feed"
-
-def apply_ui(df):
-    pass
+import ta
+from loader import show_loader
+from responsive_tabs import show_navigation
+from custom_ui import apply_ui
 
 # --- Page Setup ---
 st.set_page_config(page_title="ChartPulse", layout="wide")
@@ -35,7 +28,7 @@ period = "6mo" if interval == "1d" else "5d"
 REFRESH_INTERVAL = 1  # in minutes
 st_autorefresh(interval=REFRESH_INTERVAL * 60 * 1000, key="refresh")
 
-# --- Secrets (Telegram) ---
+# --- Secrets ---
 BOT_TOKEN = st.secrets.get("BOT_TOKEN", "")
 CHAT_ID = st.secrets.get("CHAT_ID", "")
 
@@ -44,15 +37,21 @@ def fetch_data(symbol):
     try:
         df = yf.download(symbol, period=period, interval=interval, progress=False)
 
-        if df.empty or df["Close"].dropna().empty:
-            st.warning(f"No intraday data for {symbol}. Using daily fallback.")
-            df = yf.download(symbol, period="1mo", interval="1d", progress=False)
+        # Fallback if intraday fails or missing required columns
+        if df.empty or any(col not in df.columns for col in ["Open", "High", "Low", "Close"]):
+            st.warning(f"⚠️ No intraday data for {symbol}. Using daily fallback.")
+            df = yf.download(symbol, period="6mo", interval="1d", progress=False)
+
+        # Final check
+        if df.empty or any(col not in df.columns for col in ["Open", "High", "Low", "Close"]):
+            st.error(f"❌ Data unavailable for {symbol} even with fallback.")
+            return pd.DataFrame()
 
         df = df.dropna(subset=["Open", "High", "Low", "Close"])
         df.index = pd.to_datetime(df.index)
         df.sort_index(inplace=True)
 
-        # Technical indicators
+        # Technical Indicators
         df['RSI'] = ta.momentum.RSIIndicator(df['Close'], window=14).rsi()
         macd = ta.trend.MACD(df['Close'], window_slow=26, window_fast=12, window_sign=9)
         df['MACD'] = macd.macd()
@@ -64,7 +63,13 @@ def fetch_data(symbol):
         return pd.DataFrame()
 
 def is_data_invalid(df):
-    return df.empty or any(col not in df.columns for col in ["Open", "High", "Low", "Close"])
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return True
+    if any(col not in df.columns for col in ["Open", "High", "Low", "Close"]):
+        return True
+    if df["Close"].dropna().shape[0] < 5:
+        return True
+    return False
 
 def plot_chart(df, symbol):
     fig = go.Figure(data=[go.Candlestick(
@@ -108,17 +113,12 @@ if view == "📈 Live Feed":
             st.error(f"⚠️ Signal Data Unavailable for {symbol}")
             continue
 
-        if len(df) < 30:
-            st.info(f"ℹ️ Not enough data for {symbol} (only {len(df)} rows)")
-            continue
-
         apply_ui(df)
 
         try:
             latest = float(df["Close"].iloc[-1])
             breakout = float(df["High"].tail(20).max())
             breakdown = float(df["Low"].tail(20).min())
-
             rsi = float(df["RSI"].dropna().iloc[-1]) if "RSI" in df.columns else None
             macd = float(df["MACD"].dropna().iloc[-1]) if "MACD" in df.columns else None
 
@@ -131,9 +131,9 @@ if view == "📈 Live Feed":
             )
 
             alert = None
-            if breakout and latest > breakout:
+            if breakout is not None and latest > breakout:
                 alert = f"🚀 *{symbol} Breakout!* ₹{safe_fmt(latest)} > ₹{safe_fmt(breakout)}"
-            elif breakdown and latest < breakdown:
+            elif breakdown is not None and latest < breakdown:
                 alert = f"⚠️ *{symbol} Breakdown!* ₹{safe_fmt(latest)} < ₹{safe_fmt(breakdown)}"
 
             if enable_alerts and alert:
