@@ -28,7 +28,7 @@ st_autorefresh(interval=REFRESH_INTERVAL * 60 * 1000, key="refresh")
 # --- Helper Functions ---
 def fetch_data(symbol):
     try:
-        api_key = st.secrets["alpha_vantage"]["XLXA2BC7S1DP5413"]
+        api_key = st.secrets["alpha_vantage"]["api_key"]
         ts = TimeSeries(key=api_key, output_format='pandas')
         data, meta = ts.get_daily(symbol=symbol, outputsize='compact')
 
