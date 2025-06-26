@@ -1,24 +1,23 @@
-# chartpulse/app.py — Using Alpha Vantage instead of yfinance
+# chartpulse/app.py — Using Twelve Data API
 
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-from alpha_vantage.timeseries import TimeSeries
+import requests
 import ta  # Technical Analysis indicators
-import requests  # Needed for Telegram alerts
+import telegram
 
 # --- Page Setup ---
 st.set_page_config(page_title="ChartPulse", layout="wide")
-st.title("📈 ChartPulse — Live Stock Signal Tracker (Alpha Vantage)")
+st.title("📈 ChartPulse — Live Stock Signal Tracker (Twelve Data)")
 
 # --- Sidebar Settings ---
 st.sidebar.header("⚙️ Settings")
 symbols = st.sidebar.text_area("Stock Symbols (comma-separated)", "RELIANCE.BSE, TCS.BSE").split(",")
 symbols = [s.strip().upper() for s in symbols if s.strip()]
 show_chart = st.sidebar.checkbox("📊 Show Chart", True)
-enable_alerts = st.sidebar.checkbox("📲 Enable Telegram Alerts", True)
 
 # --- Interval Selector ---
 interval = st.selectbox("🕒 Select Interval", ["1d"], index=0)
@@ -27,30 +26,47 @@ interval = st.selectbox("🕒 Select Interval", ["1d"], index=0)
 REFRESH_INTERVAL = 1  # in minutes
 st_autorefresh(interval=REFRESH_INTERVAL * 60 * 1000, key="refresh")
 
-# --- Helper Functions ---
+# --- Telegram Alert Setup (optional) ---
+use_telegram = st.sidebar.checkbox("📲 Enable Telegram Alerts")
+telegram_bot_token = st.secrets.get("telegram", {}).get("bot_token", "")
+telegram_chat_id = st.secrets.get("telegram", {}).get("chat_id", "")
+
+def send_telegram(message):
+    if use_telegram and telegram_bot_token and telegram_chat_id:
+        try:
+            bot = telegram.Bot(token=telegram_bot_token)
+            bot.send_message(chat_id=telegram_chat_id, text=message)
+        except Exception as e:
+            st.warning(f"Telegram Error: {e}")
+
+# --- Helper Function to Fetch Data ---
 def fetch_data(symbol):
     try:
-        api_key = st.secrets["alpha_vantage"]["api_key"]
-        ts = TimeSeries(key=api_key, output_format='pandas')
-        data, meta = ts.get_daily(symbol=symbol, outputsize='compact')
+        api_key = st.secrets["twelvedata"]["api_key"]
+        url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=1day&outputsize=30&apikey={api_key}"
+        response = requests.get(url).json()
 
-        df = data.rename(columns={
-            "1. open": "Open",
-            "2. high": "High",
-            "3. low": "Low",
-            "4. close": "Close",
-            "5. volume": "Volume"
-        })
-        df.index = pd.to_datetime(df.index)
-        df.sort_index(inplace=True)
+        if "values" not in response:
+            raise ValueError(response.get("message", "Unknown error"))
 
-        # Add technical indicators
-        df['RSI'] = ta.momentum.RSIIndicator(df['Close'], window=14).rsi()
-        macd = ta.trend.MACD(df['Close'])
-        df['MACD'] = macd.macd()
-        df['MACD_signal'] = macd.macd_signal()
+        data = pd.DataFrame(response["values"])
+        data.rename(columns={
+            "datetime": "Date", "open": "Open", "high": "High",
+            "low": "Low", "close": "Close", "volume": "Volume"
+        }, inplace=True)
 
-        return df
+        data["Date"] = pd.to_datetime(data["Date"])
+        data.set_index("Date", inplace=True)
+        data = data.astype(float)
+        data.sort_index(inplace=True)
+
+        # Add indicators
+        data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
+        macd = ta.trend.MACD(data['Close'])
+        data['MACD'] = macd.macd()
+        data['MACD_signal'] = macd.macd_signal()
+
+        return data
 
     except Exception as e:
         st.error(f"❌ Error fetching data for {symbol}: {e}")
@@ -104,28 +120,12 @@ for symbol in symbols:
         if show_chart:
             plot_chart(df, symbol)
 
-        # --- Signal Detection ---
-        alert = None
-        if latest > breakout:
-            alert = f"🚀 *{symbol} Breakout!* ₹{safe_fmt(latest)} > ₹{safe_fmt(breakout)}"
-        elif latest < breakdown:
-            alert = f"⚠️ *{symbol} Breakdown!* ₹{safe_fmt(latest)} < ₹{safe_fmt(breakdown)}"
-
-        # --- Telegram Alert ---
-        if enable_alerts and alert:
-            try:
-                bot_token = st.secrets["BOT_TOKEN"]
-                chat_id = st.secrets["CHAT_ID"]
-                send_text = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                params = {"chat_id": chat_id, "text": alert, "parse_mode": "Markdown"}
-                response = requests.post(send_text, data=params)
-
-                if response.status_code == 200:
-                    st.success("📲 Telegram alert sent!")
-                else:
-                    st.warning("⚠️ Alert failed to send.")
-            except Exception as e:
-                st.warning(f"❌ Telegram Error: {e}")
+        # --- Signal Alerts via Telegram ---
+        if use_telegram:
+            if latest > breakout:
+                send_telegram(f"🚨 {symbol} BREAKOUT! Current Price: ₹{safe_fmt(latest)} > ₹{safe_fmt(breakout)}")
+            elif latest < breakdown:
+                send_telegram(f"⚠️ {symbol} BREAKDOWN! Current Price: ₹{safe_fmt(latest)} < ₹{safe_fmt(breakdown)}")
 
     except Exception as e:
         st.error(f"⚠️ Processing error for {symbol}")
