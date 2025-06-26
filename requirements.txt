@@ -5,3 +5,4 @@ ta
 plotly
 requests
 alpha_vantage
+python-telegram-bot==13.15
