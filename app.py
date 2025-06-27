@@ -5,25 +5,29 @@ from ta.trend import MACD
 from ta.momentum import RSIIndicator
 from fpdf import FPDF
 from io import BytesIO
-import datetime
 
 # --- Page Config ---
 st.set_page_config(page_title="ChartPulse AI", layout="wide")
 st.title("📈 ChartPulse — AI Chart Analyzer")
 
 # --- Tabs ---
-tabs = st.tabs(["📊 AI Analysis", "🔁 Backtest Panel"])
+tabs = st.tabs(["📊 AI Analysis", "🔁 Backtest Panel", "📉 TradingView Chart"])
 
-# --- Data Fetch Function ---
+# --- Data Fetch ---
 def get_data(symbol, interval):
-    ticker = yf.Ticker(symbol + ".BS")
-    if interval == "1d":
-        df = ticker.history(period="3mo", interval="1d")
-    elif interval == "1wk":
-        df = ticker.history(period="6mo", interval="1wk")
-    else:
-        df = ticker.history(period="1y", interval="1mo")
-    return df.reset_index()
+    try:
+        if not symbol.endswith(".NS"):
+            symbol += ".NS"
+        ticker = yf.Ticker(symbol)
+        if interval == "1d":
+            df = ticker.history(period="3mo", interval="1d")
+        elif interval == "1wk":
+            df = ticker.history(period="6mo", interval="1wk")
+        else:
+            df = ticker.history(period="1y", interval="1mo")
+        return df.reset_index()
+    except:
+        return pd.DataFrame()
 
 # --- AI Insight ---
 def generate_ai_insight(df):
@@ -38,11 +42,13 @@ def generate_ai_insight(df):
         latest = df.iloc[-1]
         insight = []
 
+        # Trend
         if df["Close"].iloc[-1] > df["Close"].rolling(20).mean().iloc[-1]:
             insight.append("📈 The stock is currently in a **bullish trend**.")
         else:
             insight.append("📉 The stock is in a **bearish trend**.")
 
+        # RSI
         rsi = latest["RSI"]
         if rsi > 70:
             insight.append(f"⚠️ RSI is {rsi:.1f} — Overbought condition.")
@@ -51,11 +57,13 @@ def generate_ai_insight(df):
         else:
             insight.append(f"🔍 RSI is {rsi:.1f} — Neutral zone.")
 
+        # MACD
         if latest["MACD"] > latest["MACD_signal"]:
             insight.append("✅ MACD is above signal — bullish momentum.")
         else:
             insight.append("❌ MACD is below signal — bearish signal.")
 
+        # Final Signal
         if rsi < 30 and latest["MACD"] > latest["MACD_signal"]:
             insight.append("📊 **AI Signal: BUY**")
         elif rsi > 70 and latest["MACD"] < latest["MACD_signal"]:
@@ -75,7 +83,6 @@ def detect_patterns(df):
         latest_lows = lows[-10:]
         if (latest_lows.iloc[-3] > latest_lows.iloc[-2] < latest_lows.iloc[-1]):
             patterns.append("📉 Possible **Double Bottom** detected — may signal reversal.")
-
         if (
             df["High"].iloc[-5] < df["High"].iloc[-4] > df["High"].iloc[-3] and
             df["High"].iloc[-2] < df["High"].iloc[-4]
@@ -97,29 +104,14 @@ def export_to_pdf(content):
     buffer.seek(0)
     return buffer
 
-# --- AI Ask Mock ---
-def ai_ask_reply(query):
-    if "trend" in query.lower():
-        return "The trend is determined by moving averages and momentum indicators."
-    return "AI analysis is limited to pattern and indicator signals."
-
-# --- TradingView Embed ---
-def tradingview_widget(symbol):
-    symbol_code = symbol.upper() + ":NSE"
-    html_code = f"""
-    <iframe src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_xxx&symbol={symbol_code}&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=light&style=1&timezone=Etc/UTC&withdateranges=1&hideideas=1&studies_overrides={{}}" 
-            width="100%" height="500" frameborder="0" allowtransparency="true" scrolling="no"></iframe>
-    """
-    st.components.v1.html(html_code, height=500)
-
 # --- Tab 1: AI Analysis ---
 with tabs[0]:
     st.sidebar.header("⚙️ Settings")
     symbol = st.sidebar.text_input("Stock Symbol (NSE only)", "RELIANCE")
     interval = st.sidebar.selectbox("Interval", ["1d", "1wk", "1mo"], index=0)
 
-    try:
-        df = get_data(symbol, interval)
+    df = get_data(symbol, interval)
+    if not df.empty:
         st.subheader(f"📊 AI-Based Chart Insight — {symbol.upper()} ({interval})")
         ai_result = generate_ai_insight(df)
         st.success(ai_result)
@@ -134,28 +126,17 @@ with tabs[0]:
 
         with st.expander("📈 Show Price Chart"):
             st.line_chart(df[["Close"]])
-
-        st.subheader("📺 Live Chart — TradingView")
-        tradingview_widget(symbol)
-
-        st.subheader("💬 AI Ask Chart Assistant")
-        query = st.text_input("Ask anything about this chart")
-        if query:
-            response = ai_ask_reply(query)
-            st.info(response)
-
-    except Exception as e:
-        st.error(f"Failed to fetch/analyze: {e}")
+    else:
+        st.error("Unable to fetch data. Please check the symbol or try again.")
 
 # --- Tab 2: Backtest Panel ---
 with tabs[1]:
-    st.header("🔁 Backtesting Panel")
-    bt_symbol = st.text_input("Symbol for Backtest (NSE only)", "RELIANCE")
-    bt_strategy = st.selectbox("Strategy", ["RSI Strategy", "MACD Strategy", "Combined RSI + MACD"])
+    st.header("🔁 Backtest Strategy")
+    bt_symbol = st.text_input("Backtest Symbol (NSE only)", "RELIANCE")
+    bt_strategy = st.selectbox("Select Strategy", ["RSI Strategy", "MACD Strategy", "Combined RSI + MACD"])
 
-    try:
-        df_bt = get_data(bt_symbol, "1d")
-        df_bt.dropna(inplace=True)
+    df_bt = get_data(bt_symbol, "1d")
+    if not df_bt.empty:
         df_bt["RSI"] = RSIIndicator(close=df_bt["Close"], window=14).rsi()
         macd = MACD(close=df_bt["Close"])
         df_bt["MACD"] = macd.macd()
@@ -184,7 +165,33 @@ with tabs[1]:
             signal_df = pd.DataFrame(signals, columns=["Date", "Signal", "Price"])
             st.dataframe(signal_df)
         else:
-            st.info("No signals generated for selected strategy.")
+            st.info("No signals generated.")
+    else:
+        st.warning("Unable to load backtest data.")
 
-    except Exception as e:
-        st.error(f"Backtest failed: {e}")
+# --- Tab 3: TradingView Chart ---
+with tabs[2]:
+    st.header("📉 Live TradingView Chart")
+    tv_symbol = st.text_input("Enter TradingView Symbol (e.g., NSE:RELIANCE)", "NSE:RELIANCE")
+    st.components.v1.html(f"""
+        <div class="tradingview-widget-container">
+          <div id="tradingview_advanced_chart"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+          <script type="text/javascript">
+            new TradingView.widget({{
+              "width": "100%",
+              "height": 500,
+              "symbol": "{tv_symbol}",
+              "interval": "D",
+              "timezone": "Asia/Kolkata",
+              "theme": "light",
+              "style": "1",
+              "locale": "en",
+              "toolbar_bg": "#f1f3f6",
+              "enable_publishing": false,
+              "allow_symbol_change": true,
+              "container_id": "tradingview_advanced_chart"
+            }});
+          </script>
+        </div>
+    """, height=550)
