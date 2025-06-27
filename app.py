@@ -4,8 +4,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
-import ta
-import requests
+import ta  # Technical Analysis indicators
+import requests  # For Telegram alerts
 from twelvedata import TDClient
 
 # --- Page Setup ---
@@ -22,7 +22,7 @@ show_chart = st.sidebar.checkbox("📊 Show Chart", True)
 interval = st.selectbox("🕒 Select Interval", ["1day"], index=0)
 
 # --- Auto Refresh ---
-REFRESH_INTERVAL = 1
+REFRESH_INTERVAL = 1  # in minutes
 st_autorefresh(interval=REFRESH_INTERVAL * 60 * 1000, key="refresh")
 
 # --- Telegram Function ---
@@ -52,6 +52,7 @@ def fetch_data(symbol):
             "close": "Close",
             "volume": "Volume"
         })
+
         df = data.sort_index()
         df.index = pd.to_datetime(df.index)
 
@@ -73,51 +74,38 @@ def plot_chart(df, symbol):
     )
 
     fig.add_trace(go.Candlestick(
-        x=df.index,
-        open=df["Open"],
-        high=df["High"],
-        low=df["Low"],
-        close=df["Close"],
-        name="Price",
-        increasing_line_color="#26a69a",
-        decreasing_line_color="#ef5350"
+        x=df.index, open=df["Open"], high=df["High"],
+        low=df["Low"], close=df["Close"],
+        increasing_line_color="#26a69a", decreasing_line_color="#ef5350",
+        name="Price"
     ), row=1, col=1)
 
     fig.add_trace(go.Bar(
-        x=df.index,
-        y=df["Volume"],
-        name="Volume",
-        marker_color="#90caf9"
+        x=df.index, y=df["Volume"],
+        name="Volume", marker_color="#90caf9"
     ), row=2, col=1)
 
     fig.add_trace(go.Scatter(
-        x=df.index,
-        y=df["RSI"],
-        name="RSI",
-        line=dict(color="#2962FF", width=2)
+        x=df.index, y=df["RSI"],
+        name="RSI", line=dict(color="#2962FF", width=2)
     ), row=3, col=1)
+
     fig.add_hline(y=70, line_dash="dot", line_color="red", row=3, col=1)
     fig.add_hline(y=30, line_dash="dot", line_color="green", row=3, col=1)
 
     fig.add_trace(go.Scatter(
-        x=df.index,
-        y=df["MACD"],
-        name="MACD",
-        line=dict(color="blue", width=2)
+        x=df.index, y=df["MACD"],
+        name="MACD", line=dict(color="blue", width=2)
     ), row=4, col=1)
+
     fig.add_trace(go.Scatter(
-        x=df.index,
-        y=df["MACD_signal"],
-        name="Signal",
-        line=dict(color="orange", width=2)
+        x=df.index, y=df["MACD_signal"],
+        name="Signal", line=dict(color="orange", width=2)
     ), row=4, col=1)
 
     fig.update_layout(
-        height=1000,
-        showlegend=False,
-        template="plotly_white",
-        margin=dict(l=40, r=40, t=50, b=40),
-        xaxis4_rangeslider_visible=False
+        height=1000, showlegend=False, template="plotly_white",
+        margin=dict(l=40, r=40, t=50, b=40), xaxis4_rangeslider_visible=False
     )
 
     st.plotly_chart(fig, use_container_width=True)
@@ -133,8 +121,7 @@ now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 st.markdown(f"🕒 Last Updated: `{now}`")
 
 for symbol in symbols:
-    st.markdown("---")  # Markdown separator as plain string
-    st.markdown(f"### 🔍 {symbol}")  # Safe symbol interpolation
+    st.markdown(f"---\n### 🔍 {symbol}")
     df = fetch_data(symbol)
 
     if df.empty:
