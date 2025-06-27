@@ -133,8 +133,8 @@ now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 st.markdown(f"🕒 Last Updated: `{now}`")
 
 for symbol in symbols:
-    st.markdown(f"---
-### 🔍 {symbol}")
+    st.markdown("---")  # Markdown separator as plain string
+    st.markdown(f"### 🔍 {symbol}")  # Safe symbol interpolation
     df = fetch_data(symbol)
 
     if df.empty:
