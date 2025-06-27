@@ -16,7 +16,7 @@ tabs = st.tabs(["📊 AI Analysis", "🔁 Backtest Panel"])
 
 # --- Data Fetch Function ---
 def get_data(symbol, interval):
-    ticker = yf.Ticker(symbol + ".NS")
+    ticker = yf.Ticker(symbol + ".BS")
     if interval == "1d":
         df = ticker.history(period="3mo", interval="1d")
     elif interval == "1wk":
