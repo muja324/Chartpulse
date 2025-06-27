@@ -7,3 +7,4 @@ requests
 alpha_vantage
 python-telegram-bot==13.15
 twelvedata
+fpdf
