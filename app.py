@@ -170,7 +170,7 @@ with tabs[1]:
     # Safe-structured iframe with sandbox + proper formatting
     iframe = f"""
     <iframe
-      src="https://s.tradingview.com/widgetembed/?symbol=NSE:{tv_symbol}
+      src="https://s.tradingview.com/widgetembed/?symbol={tv_symbol}
         &interval={tv_interval}
         &hidesidetoolbar=1
         &toolbarbg=f1f3f6
