@@ -133,7 +133,7 @@ tabs = st.tabs(["📊 AI Analysis", "📉 TradingView", "🔁 Backtest", "🔔 A
 with tabs[0]:
     st.sidebar.header("⚙️ Settings")
     symbol   = st.sidebar.text_input("Stock Symbol (NSE)", "RELIANCE").upper()
-    interval = st.sidebar.selectbox("Interval", ["1h,"1d","1wk","1mo"], index=0)
+    interval = st.sidebar.selectbox("Interval", ["1h", "1d", "1wk", "1mo"], index=0)
 
     df = get_data(symbol, interval)
     if df.empty:
