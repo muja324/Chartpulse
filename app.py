@@ -133,7 +133,7 @@ tabs = st.tabs(["📊 AI Analysis", "📉 TradingView", "🔁 Backtest", "🔔 A
 with tabs[0]:
     st.sidebar.header("⚙️ Settings")
     symbol   = st.sidebar.text_input("Stock Symbol (NSE)", "RELIANCE").upper()
-    interval = st.sidebar.selectbox("Interval", ["1d","1wk","1mo"], index=0)
+    interval = st.sidebar.selectbox("Interval", ["1h,"1d","1wk","1mo"], index=0)
 
     df = get_data(symbol, interval)
     if df.empty:
@@ -158,21 +158,40 @@ with tabs[0]:
 
 # --- Tab 1: TradingView ---
 with tabs[1]:
-    st.subheader("Live TradingView Chart")
-    tv_sym    = st.text_input("TV Symbol", "RELIANCE")
-    tv_int = st.selectbox("Interval", ["5m", "15m", "30m", "1h", "D", "W", "M"], index=0)
-    studies   = ["MA%4020","BB%4020","RSI%4014"]
-    studies_q = "&".join(f"studies[]={s}" for s in studies)
-    iframe_url = """
-    <iframe src="https://s.tradingview.com/widgetembed/?frameElementId=tv_chart&symbol=NSE:RELIANCE
-    &interval=D&hidesidetoolbar=1&toolbarbg=f1f3f6&theme=light&style=1
-    &timezone=Asia/Kolkata&withdateranges=1&hideideas=1&locale=en"
-    width="100%" height="500" frameborder="0" allowtransparency="true"
-    scrolling="no" sandbox="allow-scripts allow-same-origin allow-popups">
+    st.subheader("📺 Live TradingView Chart")
+
+    tv_symbol = st.text_input("TradingView Symbol", "RELIANCE")
+    tv_interval = st.selectbox("Interval", ["D", "W", "M"], index=0)
+
+    # Studies to show in chart (Moving Average, Bollinger Bands, RSI)
+    studies = ["MA%4020", "BB%4020", "RSI%4014"]
+    studies_query = "&".join(f"studies[]={s}" for s in studies)
+
+    # Safe-structured iframe with sandbox + proper formatting
+    iframe = f"""
+    <iframe
+      src="https://s.tradingview.com/widgetembed/?symbol=NSE:{tv_symbol}
+        &interval={tv_interval}
+        &hidesidetoolbar=1
+        &toolbarbg=f1f3f6
+        &saveimage=1
+        &theme=light
+        &style=1
+        &timezone=Asia/Kolkata
+        &{studies_query}
+        &withdateranges=1
+        &hideideas=1
+        &locale=en"
+      width="100%"
+      height="500"
+      frameborder="0"
+      allowtransparency="true"
+      scrolling="no"
+      sandbox="allow-scripts allow-same-origin allow-popups">
     </iframe>
     """
 
-    st.components.v1.html(iframe, height=500)
+    st.components.v1.html(iframe, height=520)
 
 # --- Tab 2: Backtest ---
 with tabs[2]:
