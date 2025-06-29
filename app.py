@@ -159,8 +159,8 @@ with tabs[0]:
 # --- Tab 1: TradingView ---
 with tabs[1]:
     st.subheader("Live TradingView Chart")
-    tv_sym    = st.text_input("TV Symbol", "NSE:RELIANCE")
-    tv_int    = st.selectbox("Interval", ["D","W","M"], index=0)
+    tv_sym    = st.text_input("TV Symbol", "RELIANCE")
+    tv_int    = st.selectbox("Interval", ["5m"15m"30m"1h"D","W","M"], index=0)
     studies   = ["MA%4020","BB%4020","RSI%4014"]
     studies_q = "&".join(f"studies[]={s}" for s in studies)
     iframe = f"""
