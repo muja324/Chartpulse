@@ -163,15 +163,15 @@ with tabs[1]:
     tv_int = st.selectbox("Interval", ["5m", "15m", "30m", "1h", "D", "W", "M"], index=0)
     studies   = ["MA%4020","BB%4020","RSI%4014"]
     studies_q = "&".join(f"studies[]={s}" for s in studies)
-    iframe = f"""
-      <iframe src="https://s.tradingview.com/widgetembed/
-        ?symbol={tv_sym}&interval={tv_int}
-        &hidesidetoolbar=1&saveimage=1
-        &theme=light&style=1&timezone=Asia/Kolkata
-        &{studies_q}"
-        width="100%" height="500" frameborder="0"
-        allowtransparency="true" scrolling="no"></iframe>
+    iframe_url = """
+    <iframe src="https://s.tradingview.com/widgetembed/?frameElementId=tv_chart&symbol=NSE:RELIANCE
+    &interval=D&hidesidetoolbar=1&toolbarbg=f1f3f6&theme=light&style=1
+    &timezone=Asia/Kolkata&withdateranges=1&hideideas=1&locale=en"
+    width="100%" height="500" frameborder="0" allowtransparency="true"
+    scrolling="no" sandbox="allow-scripts allow-same-origin allow-popups">
+    </iframe>
     """
+
     st.components.v1.html(iframe, height=500)
 
 # --- Tab 2: Backtest ---
